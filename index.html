@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Atenuación Electromagnética - Centro Penal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6 font-sans">
+  
+  <header class="max-w-7xl mx-auto mb-6 border-b border-slate-700 pb-4">
+    <h1 class="text-2xl font-bold text-sky-400">Control Conceptual de Señales No Autorizadas</h1>
+    <p class="text-slate-400 text-sm">Simulador de Atenuación Pasiva y Balance de Enlace (FSPL vs. Coeficiente de Absorción)</p>
+  </header>
+
+  <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- PANEL DE CONTROLES -->
+    <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4">
+      <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">Variables de Ingeniería</h2>
+      
+      <!-- Frecuencia / Tecnología -->
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1">Tecnología y Frecuencia</label>
+        <select id="freqSelect" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-sky-300 focus:outline-none focus:border-sky-500">
+          <option value="850">2G - 850 MHz (λ larga, alta penetración)</option>
+          <option value="1900">3G - 1900 MHz (Propagación moderada)</option>
+          <option value="2100">4G - 2100 MHz (Sensible a obstáculos)</option>
+          <option value="3500">5G Sub-6 - 3.5 GHz (Elevada atenuación)</option>
+          <option value="28000">5G mmWave - 28 GHz (Bloqueo casi total)</option>
+        </select>
+      </div>
+
+      <!-- Material del Muro -->
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1">Material Constructivo</label>
+        <select id="materialSelect" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-amber-300 focus:outline-none focus:border-sky-500">
+          <option value="brick">Ladrillo Estándar</option>
+          <option value="reinforced_concrete" selected>Concreto Reforzado</option>
+          <option value="faraday_cage">Jaula de Faraday / Malla de Acero</option>
+        </select>
+      </div>
+
+      <!-- Grosor del Muro -->
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-slate-400">Grosor del Muro:</span>
+          <span id="thicknessValue" class="font-bold text-slate-200">0.5 m</span>
+        </div>
+        <input type="range" id="thicknessSlider" min="0.1" max="2.0" step="0.1" value="0.5" class="w-full accent-sky-500">
+      </div>
+
+      <!-- Distancia -->
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-slate-400">Distancia emisor a frontera:</span>
+          <span id="distanceValue" class="font-bold text-slate-200">15 m</span>
+        </div>
+        <input type="range" id="distanceSlider" min="1" max="100" step="1" value="15" class="w-full accent-sky-500">
+      </div>
+    </section>
+
+    <!-- PLANO 2D INTERACTIVO -->
+    <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex flex-col justify-between">
+      <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2 mb-4">Plano de Confinamiento 2D</h2>
+      
+      <div id="canvasContainer" class="relative w-full h-64 bg-slate-950 rounded-lg border border-slate-800 overflow-hidden flex items-center justify-center">
+        <!-- Emisor Interno -->
+        <div class="absolute left-8 flex flex-col items-center">
+          <div class="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-400 flex items-center justify-center animate-pulse">
+            <span class="text-xs">📱</span>
+          </div>
+          <span class="text-[10px] text-slate-400 mt-1">Celular</span>
+        </div>
+
+        <!-- Muro / Barrera -->
+        <div id="visualWall" class="absolute w-8 h-48 bg-amber-700/80 border-2 border-amber-500 rounded transition-all duration-300"></div>
+
+        <!-- Ondeo de Señal Externa / Spillover -->
+        <div class="absolute right-8 flex flex-col items-center">
+          <div id="statusIndicator" class="w-8 h-8 rounded-full flex items-center justify-center border transition-all">
+            <span id="statusIcon" class="text-xs">⚠️</span>
+          </div>
+          <span class="text-[10px] text-slate-400 mt-1">Exterior</span>
+        </div>
+      </div>
+
+      <div id="spilloverBadge" class="mt-4 p-3 rounded-lg text-center font-bold text-sm bg-red-900/50 border border-red-500 text-red-200">
+        DESBORDE DE SEÑAL DETECTADO (Spillover)
+      </div>
+    </section>
+
+    <!-- MÉTRICAS TÉCNICAS Y BALANCE DE ENLACE -->
+    <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex flex-col justify-between">
+      <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">Balance de Enlace en Tiempo Real</h2>
+      
+      <div class="space-y-3 text-sm my-auto">
+        <div class="flex justify-between border-b border-slate-700/50 pb-1">
+          <span class="text-slate-400">Pérdida Espacio Libre (FSPL):</span>
+          <span id="fsplVal" class="font-mono text-slate-200">0.00 dB</span>
+        </div>
+        <div class="flex justify-between border-b border-slate-700/50 pb-1">
+          <span class="text-slate-400">Atenuación del Material ($L_{mat}$):</span>
+          <span id="wallLossVal" class="font-mono text-amber-400">0.00 dB</span>
+        </div>
+        <div class="flex justify-between border-b border-slate-700/50 pb-1">
+          <span class="text-slate-400">Pérdida Total del Canal:</span>
+          <span id="totalLossVal" class="font-mono text-slate-200">0.00 dB</span>
+        </div>
+        <div class="flex justify-between pt-2 text-base font-bold">
+          <span class="text-slate-300">Potencia Recibida ($P_r$):</span>
+          <span id="rxPowerVal" class="font-mono text-sky-400">0.00 dBm</span>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 p-3 rounded text-xs text-slate-400">
+        <strong class="text-slate-300">Criterio de Confinamiento:</strong> Un nivel de $P_r \le -95\text{ dBm}$ garantiza la pérdida del enlace telefónico sin emitir radiación activa.
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Coeficientes de atenuación α (dB por metro) segun material y frecuencia
+    const alphaTable = {
+      brick: { 850: 3.5, 1900: 5.0, 2100: 6.0, 3500: 8.5, 28000: 45.0 },
+      reinforced_concrete: { 850: 14.0, 1900: 20.0, 2100: 22.0, 3500: 32.0, 28000: 120.0 },
+      faraday_cage: { 850: 60.0, 1900: 65.0, 2100: 70.0, 3500: 80.0, 28000: 120.0 }
+    };
+
+    // Referencias al DOM
+    const freqSelect = document.getElementById('freqSelect');
+    const materialSelect = document.getElementById('materialSelect');
+    const thicknessSlider = document.getElementById('thicknessSlider');
+    const distanceSlider = document.getElementById('distanceSlider');
+    const thicknessValue = document.getElementById('thicknessValue');
+    const distanceValue = document.getElementById('distanceValue');
+
+    const fsplVal = document.getElementById('fsplVal');
+    const wallLossVal = document.getElementById('wallLossVal');
+    const totalLossVal = document.getElementById('totalLossVal');
+    const rxPowerVal = document.getElementById('rxPowerVal');
+
+    const spilloverBadge = document.getElementById('spilloverBadge');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const statusIcon = document.getElementById('statusIcon');
+    const visualWall = document.getElementById('visualWall');
+
+    function updateSimulation() {
+      const freq = parseFloat(freqSelect.value);
+      const material = materialSelect.value;
+      const thickness = parseFloat(thicknessSlider.value);
+      const distance = parseFloat(distanceSlider.value);
+      const txPower = 23; // Potencia típica celular (dBm)
+
+      thicknessValue.textContent = `${thickness.toFixed(1)} m`;
+      distanceValue.textContent = `${distance} m`;
+
+      // 1. FSPL = 20*log10(d) + 20*log10(f) - 27.55
+      const fspl = 20 * Math.log10(distance) + 20 * Math.log10(freq) - 27.55;
+
+      // 2. Pérdida por muro
+      const alpha = alphaTable[material][freq];
+      const wallLoss = alpha * thickness;
+
+      // 3. Totales
+      const totalLoss = fspl + wallLoss;
+      const rxPower = txPower - totalLoss;
+
+      // Actualizar Métricas
+      fsplVal.textContent = `${fspl.toFixed(2)} dB`;
+      wallLossVal.textContent = `${wallLoss.toFixed(2)} dB`;
+      totalLossVal.textContent = `${totalLoss.toFixed(2)} dB`;
+      rxPowerVal.textContent = `${rxPower.toFixed(2)} dBm`;
+
+      // Visualización Muro (Grosor dinámico)
+      visualWall.style.width = `${Math.max(8, thickness * 24)}px`;
+
+      // Validación de Confinamiento (Umbral -95 dBm)
+      const isBlocked = rxPower <= -95;
+
+      if (isBlocked) {
+        spilloverBadge.className = "mt-4 p-3 rounded-lg text-center font-bold text-sm bg-emerald-900/50 border border-emerald-500 text-emerald-200";
+        spilloverBadge.textContent = "CONFINAMIENTO EXITOSO (Sin Desborde)";
+        statusIndicator.className = "w-8 h-8 rounded-full flex items-center justify-center border border-emerald-400 bg-emerald-500/20";
+        statusIcon.textContent = "🛡️";
+      } else {
+        spilloverBadge.className = "mt-4 p-3 rounded-lg text-center font-bold text-sm bg-red-900/50 border border-red-500 text-red-200";
+        spilloverBadge.textContent = "DESBORDE DE SEÑAL DETECTADO (Spillover)";
+        statusIndicator.className = "w-8 h-8 rounded-full flex items-center justify-center border border-red-400 bg-red-500/20 animate-ping";
+        statusIcon.textContent = "📡";
+      }
+    }
+
+    // Event Listeners
+    [freqSelect, materialSelect, thicknessSlider, distanceSlider].forEach(elem => {
+      elem.addEventListener('input', updateSimulation);
+    });
+
+    // Inicializar
+    updateSimulation();
+  </script>
+</body>
+</html>
